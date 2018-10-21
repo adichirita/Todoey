@@ -10,11 +10,15 @@ import UIKit
 
 class TodoListViewController: UITableViewController { //this subclassing saves us from needing to set this class as delegate of the table view, or do IBOutlets
 
-    var itemArray = ["Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff"]
+    var itemArray = [String]()
+    
+    let defaults = UserDefaults.standard
     
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        
+        itemArray = (self.defaults.array(forKey: "TodoListArray") ?? []) as! [String]
     }
     
     //MARK - TableView Datasource Methods
@@ -52,7 +56,10 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
             // what will happen once the user clicks the "Add Item" button on our UIAlert
             self.itemArray.append(textField.text!)
             //FIXME: prevent the action from going through if the text field is empty
+            
             self.tableView.reloadData()
+            
+            self.defaults.set(self.itemArray, forKey: "TodoListArray")
             print("gege Success")
         }
         

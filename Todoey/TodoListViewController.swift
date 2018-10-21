@@ -10,7 +10,7 @@ import UIKit
 
 class TodoListViewController: UITableViewController { //this subclassing saves us from needing to set this class as delegate of the table view, or do IBOutlets
 
-    let itemArray = ["Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff"]
+    var itemArray = ["Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Start new stuff", "Shop", "Finalize stuff", "Start new stuff", "Shop", "Finalize stuff"]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,6 +22,7 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         return itemArray.count
     }
     
+    //MARK - Control what cell gets displayed in each row of the table view
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
@@ -40,7 +41,32 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         
         tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
     }
-
+    
+    //MARK - Add new items
+    
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        
+        var textField = UITextField()
+        let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
+        let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
+            // what will happen once the user clicks the "Add Item" button on our UIAlert
+            self.itemArray.append(textField.text!)
+            //FIXME: prevent the action from going through if the text field is empty
+            self.tableView.reloadData()
+            print("gege Success")
+        }
+        
+        alert.addTextField { (alertTextField) in
+            alertTextField.placeholder = "Create new item here"
+            print("gege ", alertTextField.text)
+            textField = alertTextField
+        }
+        
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
+        
+    }
+    
 
 }
 

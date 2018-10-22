@@ -11,6 +11,7 @@ import UIKit
 class TodoListViewController: UITableViewController { //this subclassing saves us from needing to set this class as delegate of the table view, or do IBOutlets
 
     var itemArray = [Item]()
+    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
     let defaults = UserDefaults.standard
     
@@ -18,7 +19,24 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
         
-        itemArray = (self.defaults.array(forKey: "TodoListArray") ?? []) as! [Item]
+        //prepare a location to save our items list (since we cannot save complex objects in the user defaults
+        
+        //itemArray = (self.defaults.array(forKey: "TodoListArray") ?? []) as! [String]
+        
+        loadItems()
+    }
+    
+    func loadItems(){
+        
+        if let data = try? Data(contentsOf: dataFilePath!) {
+            let decoder = PropertyListDecoder()
+            do {
+                try itemArray = decoder.decode([Item].self, from: data)
+            } catch {
+                print("gege could not decode locally saved data \(error)")
+            }
+        }
+        
     }
     
     //MARK - TableView Datasource Methods
@@ -46,6 +64,8 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         tableView.reloadData()
         
         tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
+        
+        saveItems()
     }
     
     //MARK - Add new items
@@ -63,8 +83,8 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
             
             self.tableView.reloadData()
             
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
-            print("gege Success")
+            self.saveItems()
+            
         }
         
         alert.addTextField { (alertTextField) in
@@ -76,6 +96,18 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
         
+    }
+    
+    func saveItems(){
+        let encoder = PropertyListEncoder()
+        do {
+            let data = try encoder.encode(self.itemArray)
+            try data.write(to: self.dataFilePath!)
+        } catch {
+            print("gege Error encoding item array! \(error)")
+        }
+        print("gege Success")
+
     }
     
 

@@ -7,8 +7,8 @@
 //
 
 import Foundation
-
-class Item {
+//inherit from Codable for swift to be able to infer it's type when encoding it
+class Item : Codable {
     
     var title : String = ""
     var done: Bool = false

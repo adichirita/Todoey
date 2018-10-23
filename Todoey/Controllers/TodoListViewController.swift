@@ -7,11 +7,22 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoListViewController: UITableViewController { //this subclassing saves us from needing to set this class as delegate of the table view, or do IBOutlets
 
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    
+    var selectedCategory : Category? {
+        didSet { //triggered once set with a value
+            let request: NSFetchRequest<Item> = Item.fetchRequest()
+            request.predicate = NSPredicate(format: "parentCategory.name MATCHES %@", (selectedCategory?.name)!)
+            print("gege searching category \(selectedCategory?.name)")
+            fireRequest(with: request)
+        }
+    }
+    
     var itemArray = [Item]()
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
     let defaults = UserDefaults.standard
     
@@ -23,20 +34,7 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         
         //itemArray = (self.defaults.array(forKey: "TodoListArray") ?? []) as! [String]
         
-        loadItems()
-    }
-    
-    func loadItems(){
-        
-        if let data = try? Data(contentsOf: dataFilePath!) {
-            let decoder = PropertyListDecoder()
-            do {
-                try itemArray = decoder.decode([Item].self, from: data)
-            } catch {
-                print("gege could not decode locally saved data \(error)")
-            }
-        }
-        
+        //fireRequest() //no argument, all items
     }
     
     //MARK - TableView Datasource Methods
@@ -59,25 +57,24 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         //print(itemArray[indexPath.row])
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-        tableView.cellForRow(at: indexPath)?.accessoryType = itemArray[indexPath.row].done  ? .checkmark : .none //toggle on and off the checkmark accessory type of the cell
-        
-        tableView.reloadData()
-        
-        tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
+        //context.delete(itemArray[indexPath.row])
+        //itemArray.remove(at: indexPath.row)
         
         saveItems()
+        
+        tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
     }
-    
-    //MARK - Add new items
-    
-    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+    @IBAction func addButtonPress(_ sender: UIBarButtonItem) {
+        
         
         var textField = UITextField()
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             // what will happen once the user clicks the "Add Item" button on our UIAlert
-            let item = Item()
+            let item = Item(context: self.context)
             item.title = textField.text!
+            item.done = false
+            item.parentCategory = self.selectedCategory
             self.itemArray.append(item)
             //FIXME: prevent the action from going through if the text field is empty
             
@@ -89,27 +86,58 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         
         alert.addTextField { (alertTextField) in
             alertTextField.placeholder = "Create new item here"
-            print("gege ", alertTextField.text)
+            print("gege ", alertTextField.text!)
             textField = alertTextField
         }
         
         alert.addAction(action)
         present(alert, animated: true, completion: nil)
         
+
     }
     
     func saveItems(){
-        let encoder = PropertyListEncoder()
         do {
-            let data = try encoder.encode(self.itemArray)
-            try data.write(to: self.dataFilePath!)
+            try context.save()
         } catch {
-            print("gege Error encoding item array! \(error)")
+            print("gege Error saving context! \(error)")
         }
-        print("gege Success")
+        self.tableView.reloadData()
 
     }
     
+    func fireRequest(with request: NSFetchRequest<Item> = Item.fetchRequest()) {
+        do {
+            itemArray = try context.fetch(request)
+            print("gege searching..")
+        } catch {
+            print("gege Error searching data from coreData \(error)")
+        }
+        self.tableView.reloadData()
+    }
 
+}
+
+//MARK: Search bar methods
+extension TodoListViewController: UISearchBarDelegate {
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+    
+        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        request.predicate = NSPredicate(format: "title CONTAINS %@", searchBar.text!)
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        fireRequest(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            fireRequest()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder() //keyboard dissappears. without the dispatch queue block, focus dissapears only when using backspace, not also when clicking on the X sign in the searchbar
+            }
+        }
+    }
+    
 }
 

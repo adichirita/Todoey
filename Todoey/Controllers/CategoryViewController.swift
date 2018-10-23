@@ -7,12 +7,13 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    var categoriesArray = [Category]()
+    let realm = try! Realm() //not as bad as it looks apparently
+    
+    var categoriesArray : Results<Category>?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -26,21 +27,21 @@ class CategoryViewController: UITableViewController {
         let alert = UIAlertController(title: "Add New Category", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Category", style: .default) { (action) in
             // what will happen once the user clicks the "Add Item" button on our UIAlert
-            let category = Category(context: self.context)
+            let category = Category()
             category.name = textField.text!
 
-            self.categoriesArray.append(category)
+            //self.categoriesArray.append(category) //not needed, Result will AUTO UPDATE!
             //FIXME: prevent the action from going through if the text field is empty
             
             self.tableView.reloadData()
             
-            self.saveItems()
+            self.save(category: category)
             
         }
         
         alert.addTextField { (alertTextField) in
             alertTextField.placeholder = "Create new category here"
-            print("gege ", alertTextField.text!)
+            print("gege2 ", alertTextField.text!)
             textField = alertTextField
         }
         
@@ -51,13 +52,13 @@ class CategoryViewController: UITableViewController {
     
     //MARK: - TableView Datasource methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categoriesArray.count
+        return categoriesArray?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
-        cell.textLabel?.text = categoriesArray[indexPath.row].name
-        
+        cell.textLabel?.text = categoriesArray?[indexPath.row].name ?? "No Category Selected"
+    
         return cell
     }
     
@@ -65,32 +66,31 @@ class CategoryViewController: UITableViewController {
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destinationVC = segue.destination as! TodoListViewController
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationVC.selectedCategory = categoriesArray[indexPath.row]
-            print("gege destination \(categoriesArray[indexPath.row])")
+            destinationVC.selectedCategory = categoriesArray?[indexPath.row]
+            print("gege destination \(String(describing: categoriesArray?[indexPath.row]))")
         }
     }
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
         performSegue(withIdentifier: "categoryToItems", sender: self)
+        tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
     }
     
     //MARK: - Data Manipulation methods CRUD
-    func loadCategories(with request: NSFetchRequest<Category> = Category.fetchRequest()){
-        do {
-            categoriesArray = try context.fetch(request)
-            print("gege searching..")
-        } catch {
-            print("gege Error searching data from coreData \(error)")
-        }
+    func loadCategories(){
+        
+        categoriesArray = realm.objects(Category.self)
+        
         self.tableView.reloadData()
     }
     
-    func saveItems(){
+    func save(category: Category){
         do {
-            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
-            print("gege Error saving context! \(error)")
+            print("gege Error saving realm! \(error)")
         }
         self.tableView.reloadData()
         

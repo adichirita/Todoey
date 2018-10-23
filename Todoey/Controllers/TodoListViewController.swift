@@ -7,22 +7,21 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class TodoListViewController: UITableViewController { //this subclassing saves us from needing to set this class as delegate of the table view, or do IBOutlets
 
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    let realm = try! Realm()
     
     var selectedCategory : Category? {
-        didSet { //triggered once set with a value
-            let request: NSFetchRequest<Item> = Item.fetchRequest()
-            request.predicate = NSPredicate(format: "parentCategory.name MATCHES %@", (selectedCategory?.name)!)
-            print("gege searching category \(selectedCategory?.name)")
-            fireRequest(with: request)
+        didSet {
+            let nocateg = "nocateg"
+            print("gege Selected category: \(selectedCategory?.name ?? nocateg)")
+            loadItems()
         }
     }
     
-    var itemArray = [Item]()
+    var todoItems : Results<Item>?
     
     let defaults = UserDefaults.standard
     
@@ -39,54 +38,66 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
     
     //MARK - TableView Datasource Methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemArray.count
+        return todoItems?.count ?? 1
     }
     
     //MARK - Control what cell gets displayed in each row of the table view
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text = itemArray[indexPath.row].title
-        cell.accessoryType = itemArray[indexPath.row].done ? .checkmark : .none
+        
+        if let item = todoItems?[indexPath.row] {
+            cell.textLabel?.text = item.title
+            cell.accessoryType = item.done ? .checkmark : .none
+        }
+        else {
+            cell.textLabel?.text = "No Items"
+        }
         
         return cell
     }
     
     //MARK - TableView delegate methods fired whenever we selected/tapped on any cell in tableView
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        //print(itemArray[indexPath.row])
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-        
-        //context.delete(itemArray[indexPath.row])
-        //itemArray.remove(at: indexPath.row)
-        
-        saveItems()
-        
+        if let item = todoItems?[indexPath.row] {
+            do {
+                try realm.write {
+                    item.done = !item.done //update the "done" indicator
+                    //realm.delete(item) //delete the row when tapped
+                }
+            } catch {
+                print("gege error updating 'done' \(error)")
+            }
+        }
+        tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true) //deselect after being tapped
     }
+    
     @IBAction func addButtonPress(_ sender: UIBarButtonItem) {
-        
         
         var textField = UITextField()
         let alert = UIAlertController(title: "Add New Todoey Item", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
-            // what will happen once the user clicks the "Add Item" button on our UIAlert
-            let item = Item(context: self.context)
-            item.title = textField.text!
-            item.done = false
-            item.parentCategory = self.selectedCategory
-            self.itemArray.append(item)
-            //FIXME: prevent the action from going through if the text field is empty
             
-            self.tableView.reloadData()
-            
-            self.saveItems()
-            
+            if let currentCategory = self.selectedCategory {
+                do {
+                    try self.realm.write {
+                        let item = Item()
+                        item.title = textField.text!
+                        //item.dateCreated = Date() //Date.init(timeIntervalSinceNow: 0)
+                        currentCategory.items.append(item)
+                    }
+                } catch {
+                    print("Error saving new items \(error)")
+                }
+                
+                self.tableView.reloadData()
+            }
         }
         
         alert.addTextField { (alertTextField) in
             alertTextField.placeholder = "Create new item here"
-            print("gege ", alertTextField.text!)
+            print("gege3 ", alertTextField.text!)
             textField = alertTextField
         }
         
@@ -95,24 +106,11 @@ class TodoListViewController: UITableViewController { //this subclassing saves u
         
 
     }
-    
-    func saveItems(){
-        do {
-            try context.save()
-        } catch {
-            print("gege Error saving context! \(error)")
-        }
-        self.tableView.reloadData()
 
-    }
-    
-    func fireRequest(with request: NSFetchRequest<Item> = Item.fetchRequest()) {
-        do {
-            itemArray = try context.fetch(request)
-            print("gege searching..")
-        } catch {
-            print("gege Error searching data from coreData \(error)")
-        }
+    func loadItems() {
+        
+        todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
+        
         self.tableView.reloadData()
     }
 
@@ -123,16 +121,14 @@ extension TodoListViewController: UISearchBarDelegate {
     
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
     
-        let request: NSFetchRequest<Item> = Item.fetchRequest()
-        request.predicate = NSPredicate(format: "title CONTAINS %@", searchBar.text!)
-        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-        
-        fireRequest(with: request)
+        todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: false)
+        tableView.reloadData()
     }
+    
     
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchBar.text?.count == 0 {
-            fireRequest()
+            loadItems()
             DispatchQueue.main.async {
                 searchBar.resignFirstResponder() //keyboard dissappears. without the dispatch queue block, focus dissapears only when using backspace, not also when clicking on the X sign in the searchbar
             }
